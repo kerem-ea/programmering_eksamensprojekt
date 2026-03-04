@@ -1,84 +1,82 @@
 import random
-from sympy import randprime
 from math import gcd
+from sympy import isprime
+import hashlib
 
-def generate_seed_from_mouse(mouse_data):
-    """
-    mouse_data: liste af tuples (dx, dy, dt)
-    Returnerer en simpel int seed
-    """
-    seed = 0
-    for dx, dy, dt in mouse_data:
-        # Simpel XOR af forskudte bits
-        seed ^= (dx << 32) ^ (dy << 16) ^ dt
-    return seed
+class RSA:
+    def __init__(self, key_size: int, mouse_data: list[tuple]):
+        self.key_size = key_size
+        self.e = 65537  # Standard offentlig eksponent
+        self.d = None
+        self.n = None
+        self._generate_keys(mouse_data)
 
-def RSA_KEYGEN_with_seed(key_size, mouse_data):
-    seed = generate_seed_from_mouse(mouse_data)
-    random.seed(seed)  # Seed Python's random så randprime bliver deterministisk
-    half_key_size = key_size // 2
-    e = 65537
+    @staticmethod
+    def _generate_seed(mouse_data: list[tuple]) -> int: # _ = private metode
+        # SHA-256 hasher hele listen direkte til ét konsistent tal
+        return int.from_bytes(hashlib.sha256(str(mouse_data).encode()).digest(), 'big')
 
-    while True:
-        p = randprime(2 ** (half_key_size - 1), 2 ** half_key_size)
-        q = randprime(2 ** (half_key_size - 1), 2 ** half_key_size)
-        while q == p:
-            q = randprime(2 ** (half_key_size - 1), 2 ** half_key_size)
+    @staticmethod
+    def _generate_prime(bits: int) -> int: # _ = private metode
+        # Genererer ulige kandidat og tjekker om det er et primtal via sympy
+        while True:
+            candidate = random.getrandbits(bits) | (1 << bits - 1) | 1
+            if isprime(candidate):
+                return candidate
 
-        n = p * q
-        phi_n = (p - 1) * (q - 1)
+    def _generate_keys(self, mouse_data: list[tuple]) -> None: # _ = private metode
+        # Samme seed = samme nøgler hver gang
+        random.seed(self._generate_seed(mouse_data))
+        half = self.key_size // 2
 
-        if gcd(e, phi_n) == 1:
-            break
+        while True:
+            p = self._generate_prime(half)
+            q = self._generate_prime(half)
+            while q == p:
+                q = self._generate_prime(half)
 
-    d = pow(e, -1, phi_n)
-    return {'e': e, 'd': d, 'n': n}
+            phi_n = (p - 1) * (q - 1)
+            if gcd(self.e, phi_n) == 1:
+                break
 
-def RSA_ENCRYPT(message: bytes | str, public_key):
-    e, n = public_key['e'], public_key['n']
-    if isinstance(message, str):
-        message_bytes = message.encode('utf-8')
-    else:
-        message_bytes = message
+        self.n = p * q
+        self.d = pow(self.e, -1, phi_n)  # e*d ≡ 1 (mod phi(n))
 
-    # Antal bytes vi kan kryptere per chunk: sikre at chunk_int < n
-    max_bytes = (n.bit_length() - 1) // 8
-    if max_bytes <= 0:
-        raise ValueError("Public modulus too small to encrypt any bytes")
+    # @property gør at man skriver rsa.public_key i stedet for rsa.public_key()
+    # nøglen er en egenskab ved objektet, ikke en handling man udfører
+    @property
+    def public_key(self) -> dict:
+        return {'e': self.e, 'n': self.n}
 
-    encrypted_chunks = []
-    for i in range(0, len(message_bytes), max_bytes):
-        chunk = message_bytes[i:i + max_bytes]
-        chunk_int = int.from_bytes(chunk, 'big')
-        cipher_int = pow(chunk_int, e, n)
-        encrypted_chunks.append({'c': cipher_int, 'len': len(chunk)})
+    @property
+    def private_key(self) -> dict:
+        # d må aldrig deles
+        return {'d': self.d, 'n': self.n}
 
-    return encrypted_chunks
+    def encrypt(self, message: bytes | str) -> list[dict]:
+        if isinstance(message, str):
+            message = message.encode('utf-8')
 
+        max_bytes = (self.n.bit_length() - 1) // 8
+        chunks = []
+        for i in range(0, len(message), max_bytes):
+            chunk = message[i:i + max_bytes]
+            # c = m^e mod n
+            chunks.append({'c': pow(int.from_bytes(chunk, 'big'), self.e, self.n), 'len': len(chunk)})
+        return chunks
 
-def RSA_DECRYPT(encrypted_chunks, private_key) -> str:
-    d, n = private_key['d'], private_key['n']
-    decrypted = bytearray()
+    def decrypt(self, chunks: list) -> str:
+        decrypted = bytearray()
+        for item in chunks:
+            c      = item.get('c') if isinstance(item, dict) else item
+            length = item.get('len') if isinstance(item, dict) else None
+            dec    = pow(c, self.d, self.n)  # m = c^d mod n
 
-    for item in encrypted_chunks:
-        # Accepterer både dict-objekter og simple ints
-        if isinstance(item, dict):
-            c = item.get('c')
-            length = item.get('len', 0)
-        else:
-            c = item
-            length = None
+            length = length or (dec.bit_length() + 7) // 8
+            decrypted.extend(dec.to_bytes(length, 'big'))
 
-        dec_int = pow(c, d, n)
-
-        if length is None:
-            length = (dec_int.bit_length() + 7) // 8
-
-        if length > 0:
-            decrypted.extend(dec_int.to_bytes(length, 'big'))
-
-    try:
-        return decrypted.decode('utf-8')
-    except Exception:
-        # Hvis dekodning fejler, returner rå bytes
-        return bytes(decrypted)
+        try:
+            return decrypted.decode('utf-8')
+        except Exception:
+            # Hvis UTF-8 dekodning fejler returneres rå bytes
+            return bytes(decrypted)
