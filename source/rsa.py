@@ -13,7 +13,7 @@ class RSA:
 
     @staticmethod
     def _generate_seed(mouse_data: list[tuple]) -> int: # _ = private metode
-        # SHA-256 hasher hele listen direkte til ét konsistent tal
+        # SHA-256 hasher hele listen direkte til et konsistent 256-bit tal
         return int.from_bytes(hashlib.sha256(str(mouse_data).encode()).digest(), 'big')
 
     @staticmethod
