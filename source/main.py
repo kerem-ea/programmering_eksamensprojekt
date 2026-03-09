@@ -16,7 +16,7 @@ class App:
         self._animate()
 
     def _build_ui(self):
-        # Bygger hele UI: canvas øverst, knapper i midten, output nederst
+        # Bygger hele UI (canvas øverst, knapper i midten, output nederst)
         self.canvas = tk.Canvas(self.root, bg="#050508", highlightthickness=0, cursor="crosshair")
         self.canvas.pack(fill=tk.BOTH, expand=True, padx=12, pady=(12, 4))
         self.canvas.bind("<Motion>", self._record_mouse)
@@ -43,7 +43,6 @@ class App:
                                      state=tk.DISABLED, **style)
         self.encrypt_btn.pack(side=tk.LEFT)
 
-        # state=tk.DISABLED forhindrer brugeren i at skrive eller slette i output feltet
         self.output = tk.Text(self.root, height=12, bg="#0d0d1a", fg="#7070ff", state=tk.DISABLED,
                               font=("Courier", 19), relief=tk.FLAT, insertbackground="#7070ff")
         self.output.pack(fill=tk.BOTH, expand=True, padx=12, pady=(4, 12))
@@ -69,7 +68,6 @@ class App:
         self.mouse_label.config(text=f"Entropi: {len(self.mouse_data)} punkter optaget")
 
     def _animate(self):
-        # Opdaterer og tegner alle partikler ~60fps - døde partikler fjernes
         self.canvas.delete("particle")
         surviving = []
         for p in self.particles:
