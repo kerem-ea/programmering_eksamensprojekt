@@ -81,14 +81,11 @@ class Trekant(Figur):
     def omkreds(self):
         return self.a + self.b + self.c
 
-# Opret instanser af hver figur
 cirkel = Cirkel(radius=1)
 firkant = Firkant(a=4, b=6)
 trekant = Trekant(base=4, height=5, a=3, b=4, c=5)
 
-# Beregn og print areal og omkreds for hver figur
 figurer = [cirkel, firkant, trekant]
 
-# :.2f runder til 2 decimaler
 for figur in figurer:
     figur.print_info()
