@@ -22,14 +22,17 @@
 # Forklar hvad polymorfi betyder. 
 # Vis med et eksempel hvordan man kan have flere figurobjekter i samme liste og kalde samme metode på dem.
 import math
+from abc import ABC, abstractmethod
 
-class Figur:
+class Figur(ABC):
     def __init__(self, navn: str):
         self.navn = navn
 
+    @abstractmethod
     def areal(self):
         pass
 
+    @abstractmethod
     def omkreds(self):
         pass
 
